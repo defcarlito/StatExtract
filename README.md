@@ -19,6 +19,7 @@ Select "Plugin manager (beta)" and "Open pluginmanager".
 Ensure the box next to `StatExtract` is checked.
 
 Close this window and navigate to the `StatExtract` tab on the left. You should see the following:
+
 ![Options menu example image](img/options_ex.png)
 
 Hover over each option for further descriptions. You may enter your server URL and some authentication key as you wish. The authentication key will be sent as a header called `x-auth-key`.
@@ -31,7 +32,10 @@ Install the `StatExtract.dll` file in the `plugins/` directory from this repo.
 Open BakkesMod on your machine.
 
 Press `File > Open BakkesMod folder`. You should be in the following directory:
-`C:/Users/{user}/AppData/Roaming/bakkesmod/bakkesmod/`
+
+```
+C:/Users/{user}/AppData/Roaming/bakkesmod/bakkesmod/
+```
 
 From here, go into the `plugins/` directory. You should see a bunch of `.dll` files for all the default BakkesMod plugins. Copy the `StatExtract.dll` that you downloaded into this directory. You may close your file explorer once it is copied.
 
