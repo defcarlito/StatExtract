@@ -70,12 +70,18 @@ void StatExtract::onLoad()
 
 void StatExtract::onMatchStart() {
 
-	if (isMatchStarted) return;
+	if (isMatchStarted) {
+		LOG("Match Start: *Err* Match already started");
+		return;
+	}
+
+	LOG("Match Start: Start of match detected");
 
 	resetMatchVariables();
 
 	ServerWrapper game = gameWrapper->GetOnlineGame();
 	if (!game) return;
+	if (gameWrapper->IsInReplay()) return;
 
 	ArrayWrapper<PriWrapper> PRIs = game.GetPRIs();
 	UniqueIDWrapper uid = gameWrapper->GetUniqueID();
@@ -95,7 +101,7 @@ void StatExtract::onMatchStart() {
 
 		json player = {
 			{ "name", pri.GetPlayerName().ToString() },
-			{ "team", pri.GetTeamNum() },
+			{ "team", pri.GetTeamNum() }, 
 			{ "platform", pri.GetPlatform() },
 			{ "isLocal", pri.IsLocalPlayerPRI() },
 			{ "uid", uid.str() }
@@ -115,14 +121,26 @@ void StatExtract::onForfeit() {
 
 void StatExtract::onMatchEnd() {
 
-	if (playlist == -1) return;
+	if (playlist == -1) {
+		LOG("Match End: *Err* playlist is -1");
+		return;
+	}
+	if (gameWrapper->IsInReplay()) {
+		resetMatchVariables();
+		LOG("Err: In replay");
+		return;
+	}
 
-	// temp comment for testing
-	/*int RANKED_ONES = 10;
+	LOG("Match End: End of match detected.");
+
+	int RANKED_ONES = 10;
 	int RANKED_TWOS = 11;
 	int RANKED_THREES = 13;
 
-	if (playlist != RANKED_ONES && playlist != RANKED_TWOS && playlist != RANKED_THREES) return;
+	if (playlist != RANKED_ONES && playlist != RANKED_TWOS && playlist != RANKED_THREES) {
+		LOG("Match End: *Err* Invalid playlist.");
+		return;
+	}
 
 	CVarWrapper enableRanked1v1 = cvarManager->getCvar("ranked1v1_enabled");
 	CVarWrapper enableRanked2v2 = cvarManager->getCvar("ranked2v2_enabled");
@@ -134,8 +152,9 @@ void StatExtract::onMatchEnd() {
 
 	if (playlist == RANKED_ONES && !enableRanked1v1.getBoolValue()) return;
 	if (playlist == RANKED_TWOS && !enableRanked2v2.getBoolValue()) return;
-	if (playlist == RANKED_THREES && !enableRanked3v3.getBoolValue()) return;*/
-
+	if (playlist == RANKED_THREES && !enableRanked3v3.getBoolValue()) return;
+	
+	LOG("Match End: Was valid playlist and playlist was selected, attempting to pull stats and make request.");
 
 	// Try to pull final scoreboard stats
 	pullScoreBoardStats();
@@ -148,8 +167,6 @@ void StatExtract::onMatchEnd() {
 		MMRWrapper mmrw = gameWrapper->GetMMRWrapper();
 		mmrAfter = mmrw.GetPlayerMMR(uid, playlist);
 
-		LOG("MATCH OVER");
-
 		// Build data json
 		data["playlist"] = playlist;
 		data["mmrBefore"] = mmrBefore;
@@ -161,15 +178,15 @@ void StatExtract::onMatchEnd() {
 
 		cvarManager->log(data.dump(2));
 
-		LOG("DATA DUMPED");
+		LOG("Match End: Data dumped.");
 
 		cvarManager->executeCommand("saved_stats_toast");
 
-		// Make HTTP request
 		makePostRequestToURL(data);
 
-		// Reset variables
 		resetMatchVariables();
+
+		LOG("Match End: Reset variables and attempted post request, ready for next match");
 
 		}, 0.2f);
 
@@ -195,11 +212,20 @@ void StatExtract::onStatTickerMessage(void* params) {
 
 		if (!receiver) return;
 
+		pullScoreBoardStats(); 
+
 		UniqueIDWrapper uid = receiver.GetUniqueIdWrapper();
+
+		int currTime = game.GetSecondsRemaining();
+		bool isOvertime = game.GetbOverTime();
+
+		if (isOvertime) {
+			currTime = currTime * -1;
+		}
 
 		json goal = {
 			{ "uid", uid.str() },
-			{ "time",  game.GetSecondsRemaining() }
+			{ "time",  currTime }
 		};
 		
 		cvarManager->log(goal.dump(2));
@@ -235,7 +261,6 @@ void StatExtract::pullScoreBoardStats() {
 		}
 		
 	}
-
 }
 
 void StatExtract::RenderSettings() {
@@ -311,6 +336,7 @@ void StatExtract::RenderSettings() {
 }
 
 void StatExtract::resetMatchVariables() {
+	LOG("Reset Match Variables: Resetting variables.");
 	isMatchStarted = false;
 	playlist = -1;
 	mmrBefore = -1;
@@ -323,6 +349,8 @@ void StatExtract::resetMatchVariables() {
 }
 
 void StatExtract::makePostRequestToURL(json body) {
+
+	LOG("Make Post Request: Attempting to make HTTP Request.");
 	CVarWrapper enableHttpReq = cvarManager->getCvar("http_req_enabled");
 	CVarWrapper reqUrl = cvarManager->getCvar("http_req_url");
 	CVarWrapper authKey = cvarManager->getCvar("http_req_auth_key");
@@ -353,9 +381,11 @@ void StatExtract::makePostRequestToURL(json body) {
 		{
 			if (code == 200) {
 				cvarManager->executeCommand("made_http_request");
+				LOG("Make Post Request: Success");
 			}
 			else {
 				cvarManager->executeCommand("error_with_http_request " + std::to_string(code));
+				LOG("Make Post Request: *Err* Stats code: " + std::to_string(code));
 			}
 		});
 }
